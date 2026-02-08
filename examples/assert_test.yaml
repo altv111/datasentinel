@@ -1,0 +1,28 @@
+#config.yaml
+
+steps:
+  - name: datasetA
+    type: load
+    path: "datasentinel/data/datasetA.csv"
+    format: "csv"
+    write: True
+    write_format: "csv"
+
+  - name: datasetB
+    type: load
+    path: "datasentinel/data/datasetB.csv"
+    format: "csv"
+
+  - name: transformA
+    type: transform
+    query: "SELECT *, price * 2 as price_doubled FROM datasetA"
+    write: True
+    write_format: "csv"
+
+
+  - name: test_datasets 
+    type: test   
+    LHS_query: "SELECT * FROM transformA where price_doubled > 1000"        
+    write: True
+    write_format: "csv"
+    test: "IS_EMPTY"    

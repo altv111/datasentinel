@@ -78,4 +78,4 @@ Note: install with `pip install datasentinel`, import as `datasentinel`.
 - More loaders 
 - Improved CLI
 - Concurrent executors (bsed on depends_on in yaml)
-- PASS/FAIL specifiers
+

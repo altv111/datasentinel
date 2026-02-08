@@ -122,4 +122,17 @@ class TesterExecutor(Executor):
         if "condition_name" not in attributes and self.config.get("test"):
             attributes["condition_name"] = self.config["test"]
 
-        return self.strategy.assert_(df_a, df_b, attributes)
+        result = self.strategy.assert_(df_a, df_b, attributes)
+
+        step_name = self.config.get("name", "unnamed")
+        status = None
+        if isinstance(result, dict):
+            status = result.get("status")
+        if status:
+            color = "\033[32m" if status == "PASS" else "\033[31m"
+            reset = "\033[0m"
+            print(f"[TEST] {step_name}: {color}{status}{reset}")
+        else:
+            print(f"[TEST] {step_name}: completed")
+
+        return result
