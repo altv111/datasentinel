@@ -16,7 +16,7 @@ setup(
     url="https://github.com/altv111/datasentinel",  # Replace with your repo URL
     packages=find_packages(),
     package_data={
-        "datasentinel": ["data/*", "config.yaml"],
+        "datasentinel": ["data/*", "config.yaml", "conditions.properties"],
     },
     entry_points={
         "console_scripts": [

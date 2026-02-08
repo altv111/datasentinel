@@ -1,5 +1,5 @@
 
 from datasentinel.cli import main as run
-from datasentinel.comparison_strategy import ComparisonStrategy
+from datasentinel.assert_strategy import AssertStrategy
 
-__all__ = ["run", "ComparisonStrategy"]
+__all__ = ["run", "AssertStrategy"]

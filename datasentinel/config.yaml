@@ -22,10 +22,11 @@ steps:
 
   - name: test_datasets
     type: test
-    dataset_a: datasetA
-    dataset_b: datasetB
+    LHS: datasetA
+    RHS: datasetB
     write: True
     write_format: "csv"
-    join_columns: ["product"]
-    compare_columns: ["price"]
-    comparison_type: "full_outer_join"
+    test: "full_recon"
+    additional_attributes:
+      join_columns: ["product"]
+      compare_columns: ["price"]

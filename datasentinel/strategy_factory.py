@@ -1,25 +1,23 @@
 # strategy_factory.py
 
-from datasentinel.comparison_strategy import (
+from datasentinel.assert_strategy import (
     FullOuterJoinStrategy,
-    ComparisonStrategy,
+    AssertStrategy,
+    SqlAssertStrategy,
 )
 
 
 class StrategyFactory:
     @staticmethod
-    def get_comparison_strategy(config: dict) -> ComparisonStrategy:
+    def get_assert_strategy(config: dict) -> AssertStrategy:
         """
-        Determines the comparison strategy based on the configuration.
+        Determines the assert strategy based on the configuration.
         """
-        strategy_name = config.get("comparison_type", "full_outer_join")
+        strategy_name = config.get("test", config.get("comparison_type", "full_outer_join"))
 
-        if strategy_name == "full_outer_join":
+        if strategy_name in ("full_outer_join", "full_recon"):
             return FullOuterJoinStrategy()
-        else:
-            raise ValueError(
-                f"Unknown comparison strategy: {strategy_name}"
-            )
+        return SqlAssertStrategy()
 
 
 if __name__ == "__main__":

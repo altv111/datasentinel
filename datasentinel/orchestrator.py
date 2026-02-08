@@ -54,7 +54,10 @@ class Orchestrator:
                     if isinstance(result, DataFrame):
                         dataframes["output"] = result
                     elif isinstance(result, dict):
-                        dataframes = result
+                        if "dataframes" in result and isinstance(result["dataframes"], dict):
+                            dataframes = result["dataframes"]
+                        else:
+                            dataframes = result
                     WriteExecutor(self.spark, step, dataframes, self.path_resolver, self.run_id).execute()
 
             except Exception as e:

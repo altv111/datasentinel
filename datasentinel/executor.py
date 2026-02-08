@@ -101,15 +101,25 @@ class TransformExecutor(Executor):
 class TesterExecutor(Executor):
     def __init__(self, spark: SparkSession, config: dict, path_resolver, run_id: str):
         super().__init__(spark, config, path_resolver, run_id)
-        self.strategy = StrategyFactory.get_comparison_strategy(config)
+        self.strategy = StrategyFactory.get_assert_strategy(config)
 
     def execute(self) -> dict:
-        df_a_name = self.config['dataset_a']
-        df_b_name = self.config['dataset_b']
-        df_a = self.spark.table(df_a_name)
-        df_b = self.spark.table(df_b_name)
-        mismatches, a_only, b_only = self.strategy.compare(df_a, df_b, self.config['join_columns'], self.config['compare_columns'])
-        mismatches.show() #Need to improve this later
-        a_only.show()
-        b_only.show()
-        return {"mismatches": mismatches, "a_only": a_only, "b_only": b_only}
+        lhs_name = self.config.get("LHS")
+        rhs_name = self.config.get("RHS")
+        lhs_query = self.config.get("LHS_query")
+        rhs_query = self.config.get("RHS_query")
+        if not lhs_name and not lhs_query:
+            raise ValueError("Test steps require LHS or LHS_query.")
+        if lhs_name and lhs_query:
+            raise ValueError("Provide only one of LHS or LHS_query.")
+        if rhs_name and rhs_query:
+            raise ValueError("Provide only one of RHS or RHS_query.")
+
+        df_a = self.spark.sql(lhs_query) if lhs_query else self.spark.table(lhs_name)
+        df_b = self.spark.sql(rhs_query) if rhs_query else (self.spark.table(rhs_name) if rhs_name else None)
+
+        attributes = dict(self.config.get("additional_attributes") or {})
+        if "condition_name" not in attributes and self.config.get("test"):
+            attributes["condition_name"] = self.config["test"]
+
+        return self.strategy.assert_(df_a, df_b, attributes)
