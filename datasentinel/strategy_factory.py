@@ -5,6 +5,7 @@ from datasentinel.assert_strategy import (
     AssertStrategy,
     SqlAssertStrategy,
     LocalFastReconStrategy,
+    ArrowReconStrategy,
 )
 
 
@@ -20,6 +21,8 @@ class StrategyFactory:
             return FullOuterJoinStrategy()
         if strategy_name in ("localfast_recon",):
             return LocalFastReconStrategy()
+        if strategy_name in ("arrow_recon",):
+            return ArrowReconStrategy()
         return SqlAssertStrategy()
 
 

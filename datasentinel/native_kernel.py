@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 #from datasentinel.native_kernel import compare_with_tolerance
 
 
@@ -24,6 +25,13 @@ def _coerce_numeric(arr):
         return None
 
 
+def _coerce_numeric_with_invalid(arr, null_mask):
+    coerced = pd.to_numeric(arr, errors="coerce")
+    coerced_arr = np.asarray(coerced, dtype=float)
+    invalid = np.isnan(coerced_arr) & ~null_mask
+    return coerced_arr, invalid
+
+
 def run_local_tolerance(
     joined_df, compare_defs, *, left_suffix="_left", right_suffix="_right"
 ):
@@ -35,9 +43,8 @@ def run_local_tolerance(
         raise ValueError("No compare columns specified")
     per_column_result = []
     for col, cfg in compare_defs.items():
-        tol = cfg.get("tolerance")
-        if tol is None:
-            tol = 0
+        tol = cfg.get("tolerance", 0)
+        semantics = cfg.get("semantics", "column_infer")
         left_col = f"{col}{left_suffix}"
         right_col = f"{col}{right_suffix}"
         if left_col not in joined_df.columns or right_col not in joined_df.columns:
@@ -51,15 +58,48 @@ def run_local_tolerance(
         col_result = np.zeros(len(joined_df), dtype=bool)
         # both nulls -> match
         col_result[both_null] = True
-        # both_present -> numeric compare when possible, else string equality
+        # both_present -> apply semantics
         both_present = ~(left_is_null | right_is_null)
         if np.any(both_present):
-            left_num = _coerce_numeric(left[both_present])
-            right_num = _coerce_numeric(right[both_present])
-            if left_num is not None and right_num is not None:
-                col_result[both_present] = np.abs(left_num - right_num) <= tol
-            else:
+            if semantics == "string":
                 col_result[both_present] = left[both_present] == right[both_present]
+            elif semantics == "numeric":
+                left_num, left_invalid = _coerce_numeric_with_invalid(
+                    left[both_present], left_is_null[both_present]
+                )
+                right_num, right_invalid = _coerce_numeric_with_invalid(
+                    right[both_present], right_is_null[both_present]
+                )
+                numeric_valid = ~(left_invalid | right_invalid)
+                numeric_match = np.abs(left_num - right_num) <= tol
+                col_result[both_present] = numeric_valid & numeric_match
+            elif semantics == "row_infer":
+                left_num, left_invalid = _coerce_numeric_with_invalid(
+                    left[both_present], left_is_null[both_present]
+                )
+                right_num, right_invalid = _coerce_numeric_with_invalid(
+                    right[both_present], right_is_null[both_present]
+                )
+                numeric_valid = ~(left_invalid | right_invalid)
+                numeric_match = np.abs(left_num - right_num) <= tol
+                string_match = left[both_present] == right[both_present]
+                col_result[both_present] = (numeric_valid & numeric_match) | (
+                    ~numeric_valid & string_match
+                )
+            elif semantics == "column_infer":
+                left_num, left_invalid = _coerce_numeric_with_invalid(
+                    left[both_present], left_is_null[both_present]
+                )
+                right_num, right_invalid = _coerce_numeric_with_invalid(
+                    right[both_present], right_is_null[both_present]
+                )
+                has_non_numeric = np.any(left_invalid | right_invalid)
+                if has_non_numeric:
+                    col_result[both_present] = left[both_present] == right[both_present]
+                else:
+                    col_result[both_present] = np.abs(left_num - right_num) <= tol
+            else:
+                raise ValueError(f"Unknown semantics: {semantics}")
         # one-null rows remain False
         per_column_result.append(col_result)
     return np.logical_and.reduce(per_column_result)

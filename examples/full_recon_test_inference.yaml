@@ -1,0 +1,41 @@
+#config.yaml
+
+steps:
+  - name: datasetC
+    type: load
+    path: "datasentinel/data/datasetC.csv"
+    format: "csv"
+    write: True
+    write_format: "csv"
+
+  - name: datasetD
+    type: load
+    path: "datasentinel/data/datasetD.csv"
+    format: "csv"
+
+  - name: test_datasets
+    type: test
+    LHS: datasetC
+    RHS: datasetD
+    write: True
+    write_format: "csv"
+    test: "full_recon"
+    additional_attributes:
+      join_columns: ["product"]
+      compare_columns:
+        price:
+          tolerance: 0
+
+  
+  - name: test_datasets_localfast
+    type: test
+    LHS: datasetC
+    RHS: datasetD
+    write: True
+    write_format: "csv"
+    test: "localfast_recon"
+    additional_attributes:
+      join_columns: ["product"]
+      compare_columns:
+        price:
+          tolerance: 0

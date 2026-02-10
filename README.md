@@ -31,14 +31,30 @@ and clear failure reporting**, while staying close to Spark.
 DataSentinel provides multiple recon strategies. The two main ones are:
 - `FullOuterJoinStrategy` (Spark-native join + per-row comparison)
 - `LocalFastReconStrategy` (Spark join + Pandas local tolerance kernel)
+- `ArrowReconStrategy` (row-level inference only; Arrow/C++ backend planned)
 
 They are aligned on null handling for compare columns:
 - Both nulls are treated as a match.
 - One-side null is a mismatch.
 
-Behavioral differences to be aware of:
-- No tolerance: `LocalFastReconStrategy` attempts numeric coercion even with `tol=0`. This means numeric-like strings (e.g., `"01"` vs `"1"`) can match locally, while `FullOuterJoinStrategy` treats them as different strings.
-- Tolerance present: `LocalFastReconStrategy` chooses numeric vs string comparison per column (if any non-numeric exists in the column, it falls back to string compare for all rows). `FullOuterJoinStrategy` chooses per row (numeric when both cast successfully, otherwise string compare for that row).
+### Comparison semantics (per compare column)
+You can control how values are compared using the `semantics` option:
+```yaml
+compare_columns:
+  price:
+    tolerance: 0.01
+    semantics: column_infer | row_infer | numeric | string
+```
+
+Defaults:
+- `semantics` defaults to `column_infer`.
+- `tolerance` defaults to `0` when omitted.
+
+Modes:
+- `column_infer` (default): If any non-numeric value exists in the column (excluding nulls), compare as strings for all rows. Otherwise compare numerically using tolerance.
+- `row_infer`: Compare numerically when both values cast to numeric for that row; otherwise compare as strings for that row.
+- `numeric`: Always compare numerically; non-numeric values are treated as mismatches.
+- `string`: Always compare as strings; tolerance is ignored.
 
 ## Quick Start
 ```bash
