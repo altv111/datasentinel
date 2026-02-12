@@ -4,15 +4,10 @@ from pyspark.sql import SparkSession
 from datasentinel.orchestrator import Orchestrator
 
 
-def main():
+def run(config_path: str) -> None:
     """
-    Main entry point for the data-assert CLI.
+    Programmatic entry point to execute a DataSentinel config.
     """
-    if len(sys.argv) != 2:
-        print("Usage: datasentinel <yaml_config_path>")
-        sys.exit(1)
-
-    config_path = sys.argv[1]
 
     spark = (
         SparkSession.builder
@@ -24,6 +19,18 @@ def main():
     comparator.execute_steps()
 
     spark.stop()
+
+
+def main(argv=None):
+    """
+    CLI entry point.
+    """
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        print("Usage: datasentinel <yaml_config_path>")
+        sys.exit(1)
+
+    run(args[0])
 
 
 if __name__ == "__main__":
