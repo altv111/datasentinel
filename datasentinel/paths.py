@@ -1,11 +1,12 @@
 import os
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True)
 class PathResolver:
-    results_home: str | None
-    input_home: str | None
+    results_home: Optional[str]
+    input_home: Optional[str]
 
     @classmethod
     def from_env(cls) -> "PathResolver":
@@ -17,7 +18,7 @@ class PathResolver:
             input_home = os.path.abspath(os.path.expanduser(input_home))
         return cls(results_home=results_home, input_home=input_home)
 
-    def resolve_input(self, path: str | None, *, allow_cwd_fallback: bool = False) -> str | None:
+    def resolve_input(self, path: Optional[str], *, allow_cwd_fallback: bool = False) -> Optional[str]:
         if not path:
             return path
         if os.path.isabs(path):

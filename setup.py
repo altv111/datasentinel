@@ -6,14 +6,20 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="datasentinel",  # Replace with your package name
-    version="0.1.0",  # Start with a semantic versioning
-    author="Your Name",  # Replace with your name
-    author_email="your.email@example.com",  # Replace with your email
+    name="datasentinel",
+    version="0.1.0",
+    author="Samarth Bartaria",
+    author_email="cyberaltv1@gmail.com",
     description="A library for comparing datasets.",
+    license="Apache-2.0",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/altv111/datasentinel",  # Replace with your repo URL
+    url="https://github.com/altv111/datasentinel",
+    project_urls={
+        "Source": "https://github.com/altv111/datasentinel",
+        "Issues": "https://github.com/altv111/datasentinel/issues",
+    },
+    keywords=["data-quality", "data-reconciliation", "pyspark", "spark"],
     packages=find_packages(),
     package_data={
         "datasentinel": ["data/*", "config.yaml", "conditions.properties"],
@@ -25,7 +31,7 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",  # Choose your license
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.7",  # Specify the minimum version of Python

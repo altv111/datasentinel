@@ -62,7 +62,7 @@ if you do not use `arrow_recon`, the rest of the package works normally.
 
 ## Quick Start
 ```bash
-datasentinel datasentinel/config.yaml
+datasentinel examples/full_recon_test.yaml
 ```
 
 ```python
@@ -110,4 +110,4 @@ Note: install with `pip install datasentinel`, import as `datasentinel`.
 - More asserts and built-in SQL conditions
 - More loaders 
 - Improved CLI
-- Concurrent executors (bsed on depends_on in yaml)
+- Concurrent executors (based on depends_on in yaml)

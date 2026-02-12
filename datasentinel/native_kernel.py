@@ -4,10 +4,8 @@ import pandas as pd
 
 
 def _null_mask(arr):
-    try:
-        return np.isnan(arr)
-    except TypeError:
-        return arr == None
+    # pd.isna handles mixed/object arrays and None/NaN consistently.
+    return pd.isna(arr)
 
 
 def _null_masks(left_arr, right_arr):

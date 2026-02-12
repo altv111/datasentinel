@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 
 def _parse_properties(text: str) -> Dict[str, str]:
@@ -22,7 +22,7 @@ def _parse_properties(text: str) -> Dict[str, str]:
     return conditions
 
 
-def load_conditions(base_path: str | None = None, user_path: str | None = None) -> Dict[str, str]:
+def load_conditions(base_path: Optional[str] = None, user_path: Optional[str] = None) -> Dict[str, str]:
     if base_path is None:
         base_path = os.path.join(os.path.dirname(__file__), "conditions.properties")
     conditions: Dict[str, str] = {}
