@@ -71,6 +71,15 @@ from datasentinel import run, AssertStrategy
 
 Environment: `SENTINEL_HOME` sets the base directory for result writes. `SENTINEL_INPUT_HOME` sets the base directory for relative input paths in YAML.
 
+Loader-specific examples:
+- `examples/load_csv_example.yaml`
+- `examples/load_json_example.yaml`
+- `examples/load_parquet_example.yaml`
+- `examples/load_avro_example.yaml`
+- `examples/load_jdbc_query_example.yaml`
+- `examples/load_jdbc_table_example.yaml`
+- `examples/large_recon_multikey_example.yaml` (csv load + transform + SQL assert + multi-key recon on large-ish sample data)
+
 ## SQL Asserts
 DataSentinel supports SQL-based asserts that evaluate a boolean condition over `LHS` and `RHS`.
 

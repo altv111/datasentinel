@@ -12,6 +12,7 @@ from datasentinel.executor import (
     TesterExecutor,
     WriteExecutor,
 )
+from datasentinel.exceptions import RunTestFailure
 
 EXECUTOR_REGISTRY = {
     "load": LoadExecutor,
@@ -69,7 +70,7 @@ class Orchestrator:
                 raise
         if failed_tests:
             names = ", ".join(failed_tests)
-            raise RuntimeError(f"One or more tests failed: {names}")
+            raise RunTestFailure(f"One or more tests failed: {names}")
 
     @staticmethod
     def _generate_run_id() -> str:

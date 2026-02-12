@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import Mock
 
 from datasentinel import cli
+from datasentinel.exceptions import RunTestFailure
 
 
 def test_cli_requires_config_path(monkeypatch, capsys):
@@ -18,6 +19,19 @@ def test_cli_main_delegates_to_run(monkeypatch):
     monkeypatch.setattr(cli, "run", run_mock)
     cli.main(["examples/assert_test.yaml"])
     run_mock.assert_called_once_with("examples/assert_test.yaml")
+
+
+def test_cli_main_handles_test_failure_without_traceback(monkeypatch, capsys):
+    def _raise(_path):
+        raise RunTestFailure("One or more tests failed: recon_trades_multikey")
+
+    monkeypatch.setattr(cli, "run", _raise)
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["examples/large_recon_multikey_example.yaml"])
+
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert "One or more tests failed: recon_trades_multikey" in captured.out
 
 
 def test_run_executes_orchestrator_and_stops_spark(monkeypatch):

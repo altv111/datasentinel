@@ -1,0 +1,54 @@
+steps:
+  - name: trades_left
+    type: load
+    path: "examples/data/trades_left_large.csv"
+    format: "csv"
+
+  - name: trades_right
+    type: load
+    path: "examples/data/trades_right_large.csv"
+    format: "csv"
+
+  - name: trades_left_enriched
+    type: transform
+    query: |
+      SELECT
+        trade_date,
+        tradebook,
+        trade_id,
+        currency,
+        price,
+        quantity,
+        notional,
+        CASE
+          WHEN notional >= 1500 THEN 'HIGH'
+          ELSE 'NORMAL'
+        END AS notional_band
+      FROM trades_left
+
+  - name: assert_non_negative_qty
+    type: test
+    LHS_query: "SELECT * FROM trades_left_enriched WHERE quantity <= 0"
+    test: "IS_EMPTY"
+
+  - name: recon_trades_multikey
+    type: test
+    LHS: trades_left
+    RHS: trades_right
+    test: "full_recon"
+    write: true
+    write_format: "csv"
+    additional_attributes:
+      join_columns: ["trade_date", "tradebook", "trade_id"]
+      compare_columns:
+        currency:
+          semantics: string
+        price:
+          semantics: numeric
+          tolerance: 0.01
+        quantity:
+          semantics: numeric
+          tolerance: 0
+        notional:
+          semantics: numeric
+          tolerance: 0.01

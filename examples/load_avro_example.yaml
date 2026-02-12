@@ -1,0 +1,8 @@
+steps:
+  - name: dataset_avro
+    type: load
+    # Replace with your avro dataset path.
+    path: "/path/to/dataset.avro"
+    format: "avro"
+    write: true
+    write_format: "csv"

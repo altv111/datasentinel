@@ -1,0 +1,11 @@
+steps:
+  - name: trade_pricing_table
+    type: load
+    format: "jdbc"
+    db_type: "postgres"
+    connection_string: "jdbc:postgresql://localhost:5432/postgres"
+    table_name: "trade_pricing"
+    jdbc_options:
+      fetchsize: "1000"
+    write: true
+    write_format: "csv"

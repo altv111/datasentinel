@@ -3,6 +3,7 @@ from unittest.mock import Mock
 import pytest
 
 from datasentinel.orchestrator import Orchestrator
+from datasentinel.exceptions import RunTestFailure
 
 
 class _FakeLoadExecutor:
@@ -100,5 +101,5 @@ def test_orchestrator_execute_steps_raises_if_any_test_fails(monkeypatch):
     )
 
     o = Orchestrator(spark=Mock(), config_path="cfg.yaml")
-    with pytest.raises(RuntimeError, match="One or more tests failed: test_fail"):
+    with pytest.raises(RunTestFailure, match="One or more tests failed: test_fail"):
         o.execute_steps()

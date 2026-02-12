@@ -1,0 +1,8 @@
+steps:
+  - name: dataset_parquet
+    type: load
+    # Replace with your parquet dataset path.
+    path: "/path/to/dataset.parquet"
+    format: "parquet"
+    write: true
+    write_format: "csv"

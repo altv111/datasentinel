@@ -1,0 +1,7 @@
+steps:
+  - name: dataset_json
+    type: load
+    path: "datasentinel/data/datasetA.json"
+    format: "json"
+    write: true
+    write_format: "csv"

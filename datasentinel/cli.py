@@ -2,6 +2,7 @@ import sys
 
 from pyspark.sql import SparkSession
 from datasentinel.orchestrator import Orchestrator
+from datasentinel.exceptions import RunTestFailure
 
 
 def run(config_path: str) -> None:
@@ -30,7 +31,11 @@ def main(argv=None):
         print("Usage: datasentinel <yaml_config_path>")
         sys.exit(1)
 
-    run(args[0])
+    try:
+        run(args[0])
+    except RunTestFailure as exc:
+        print(str(exc))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

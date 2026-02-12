@@ -1,0 +1,7 @@
+steps:
+  - name: dataset_csv
+    type: load
+    path: "datasentinel/data/datasetA.csv"
+    format: "csv"
+    write: true
+    write_format: "csv"
