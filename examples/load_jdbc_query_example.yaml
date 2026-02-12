@@ -6,6 +6,8 @@ steps:
     connection_string: "jdbc:postgresql://localhost:5432/postgres"
     query: "SELECT * FROM trade_pricing WHERE trade_date = '2026-02-12' AND tradebook = 'EQD'"
     jdbc_options:
+      user: "postgres"
+      password: "postgres"
       fetchsize: "1000"
     write: true
     write_format: "csv"

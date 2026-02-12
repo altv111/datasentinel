@@ -6,6 +6,8 @@ steps:
     connection_string: "jdbc:postgresql://localhost:5432/postgres"
     table_name: "trade_pricing"
     jdbc_options:
+      user: "postgres"
+      password: "postgres"
       fetchsize: "1000"
     write: true
     write_format: "csv"

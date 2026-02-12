@@ -125,7 +125,7 @@ Required fields for JDBC load steps:
 
 Optional fields:
 - `driver` (overrides the default driver inferred from `db_type`)
-- `jdbc_options` (key/value options passed to Spark JDBC reader, e.g. `fetchsize`)
+- `jdbc_options` (key/value options passed to Spark JDBC reader, e.g. `user`, `password`, `fetchsize`)
 
 Example: query-based load
 ```yaml
@@ -135,6 +135,10 @@ Example: query-based load
   db_type: postgres
   connection_string: jdbc:postgresql://host:5432/riskdb
   query: "SELECT * FROM trade_pricing WHERE trade_date = '2026-02-12' AND tradebook = 'EQD'"
+  jdbc_options:
+    user: "postgres"
+    password: "postgres"
+    fetchsize: "1000"
 ```
 
 Example: full-table load
@@ -146,6 +150,8 @@ Example: full-table load
   connection_string: jdbc:postgresql://host:5432/riskdb
   table_name: trade_pricing
   jdbc_options:
+    user: "postgres"
+    password: "postgres"
     fetchsize: "1000"
 ```
 
