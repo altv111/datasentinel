@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession, DataFrame
 import logging
 import os
 
-from datasentinel.data_loader import load_data, load_table_data
+from datasentinel.data_loader import load_data, load_table_data, load_http_data
 from datasentinel.strategy_factory import StrategyFactory
 
 
@@ -73,6 +73,17 @@ class LoadExecutor(Executor):
                     jdbc_options=self.config.get("jdbc_options"),
                     driver=self.config.get("driver"),
                 )
+            elif file_format == "http":
+                df = load_http_data(
+                    url=self.config["url"],
+                    spark=self.spark,
+                    response_format=self.config["response_format"],
+                    method=self.config.get("method", "GET"),
+                    params=self.config.get("params"),
+                    headers=self.config.get("headers"),
+                    timeout_seconds=int(self.config.get("timeout_seconds", 30)),
+                    json_path=self.config.get("json_path"),
+                )
             else:
                 file_path = self.path_resolver.resolve_input(
                     self.config["path"],
@@ -134,6 +145,8 @@ class TesterExecutor(Executor):
         attributes = dict(self.config.get("additional_attributes") or {})
         if "condition_name" not in attributes and self.config.get("test"):
             attributes["condition_name"] = self.config["test"]
+        if "summary_with_counts" not in attributes:
+            attributes["summary_with_counts"] = bool(self.config.get("write")) or bool(self.config.get("debug"))
 
         result = self.strategy.assert_(df_a, df_b, attributes)
 
@@ -144,7 +157,9 @@ class TesterExecutor(Executor):
         if status:
             color = "\033[32m" if status == "PASS" else "\033[31m"
             reset = "\033[0m"
-            print(f"[TEST] {step_name}: {color}{status}{reset}")
+            summary = result.get("summary") if isinstance(result, dict) else None
+            summary_text = f" ({summary})" if summary else ""
+            print(f"[TEST] {step_name}: {color}{status}{reset}{summary_text}")
         else:
             print(f"[TEST] {step_name}: completed")
 

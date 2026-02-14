@@ -1,0 +1,24 @@
+steps:
+  - name: api_trades_csv
+    type: load
+    format: "http"
+    url: "https://www.stats.govt.nz/assets/Uploads/Annual-enterprise-survey/Annual-enterprise-survey-2024-financial-year-provisional/Download-data/annual-enterprise-survey-2024-financial-year-provisional.csv"
+    method: "GET"    
+    response_format: "csv"
+    timeout_seconds: 30
+    write: False
+    write_format: "csv"
+
+  - name: count_rows
+    type: transform
+    query: "SELECT COUNT(*) FROM api_trades_csv"
+    write: True
+    write_format: "csv"
+
+  - name: test_completeness
+    type: test
+    LHS: count_rows
+    RHS_query: select 55620
+    test: EQUALS
+
+

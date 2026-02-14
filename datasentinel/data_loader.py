@@ -1,6 +1,9 @@
 from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.types import StructType, StructField, StringType
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
+import csv
+import io
 import os
 import yaml
 
@@ -67,6 +70,94 @@ def load_table_data(
 
     df = reader.load()
     return df
+
+
+def _extract_json_path(payload: Any, json_path: Optional[str]) -> Any:
+    if not json_path:
+        return payload
+    current = payload
+    for part in json_path.split("."):
+        if isinstance(current, dict):
+            if part not in current:
+                raise ValueError(f"json_path segment '{part}' not found in payload.")
+            current = current[part]
+            continue
+        if isinstance(current, list) and part.isdigit():
+            idx = int(part)
+            if idx < 0 or idx >= len(current):
+                raise ValueError(f"json_path index '{part}' out of range.")
+            current = current[idx]
+            continue
+        raise ValueError(f"json_path segment '{part}' is invalid for current payload type.")
+    return current
+
+
+def _to_row_dicts(payload: Any) -> list:
+    if isinstance(payload, dict):
+        return [payload]
+    if isinstance(payload, list):
+        if not payload:
+            return []
+        if all(isinstance(item, dict) for item in payload):
+            return payload
+        return [{"value": item} for item in payload]
+    raise ValueError("JSON payload must be an object or list.")
+
+
+def _empty_csv_dataframe(spark: SparkSession, headers: list) -> DataFrame:
+    schema = StructType([StructField(name, StringType(), True) for name in headers])
+    return spark.createDataFrame([], schema)
+
+
+def _http_get(url: str, *, params=None, headers=None, timeout=30):
+    import requests
+
+    return requests.get(url, params=params, headers=headers, timeout=timeout)
+
+
+def load_http_data(
+    url: str,
+    spark: SparkSession,
+    response_format: str,
+    method: str = "GET",
+    params: Optional[Dict[str, str]] = None,
+    headers: Optional[Dict[str, str]] = None,
+    timeout_seconds: int = 30,
+    json_path: Optional[str] = None,
+) -> DataFrame:
+    """
+    Loads data from an HTTP endpoint and materializes it into a Spark DataFrame.
+    """
+    method_upper = (method or "GET").upper()
+    if method_upper != "GET":
+        raise ValueError("HTTP loader currently supports only GET.")
+
+    response = _http_get(
+        url,
+        params=params,
+        headers=headers,
+        timeout=timeout_seconds,
+    )
+    response.raise_for_status()
+
+    fmt = (response_format or "").lower()
+    if fmt == "json":
+        payload = _extract_json_path(response.json(), json_path)
+        rows = _to_row_dicts(payload)
+        if not rows:
+            raise ValueError("HTTP JSON response produced no rows.")
+        return spark.createDataFrame(rows)
+
+    if fmt == "csv":
+        reader = csv.DictReader(io.StringIO(response.text))
+        rows = list(reader)
+        if rows:
+            return spark.createDataFrame(rows)
+        if reader.fieldnames:
+            return _empty_csv_dataframe(spark, reader.fieldnames)
+        raise ValueError("HTTP CSV response has no header row.")
+
+    raise ValueError("response_format must be one of: json, csv.")
 
 
 def load_config(config_path: str) -> dict:

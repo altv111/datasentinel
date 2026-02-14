@@ -5,6 +5,7 @@ from datasentinel.data_loader import (
     get_driver_class,
     get_file_loader,
     load_config,
+    load_http_data,
     load_table_data,
 )
 
@@ -95,4 +96,79 @@ def test_load_table_data_requires_exactly_one_source():
             db_type="postgres",
             connection_string="jdbc:postgresql://localhost:5432/db",
             spark=spark,
+        )
+
+
+def test_load_http_data_json_with_path(monkeypatch):
+    spark = Mock()
+    spark.createDataFrame.return_value = "df"
+
+    response = Mock()
+    response.json.return_value = {"data": {"items": [{"id": 1, "book": "EQD"}]}}
+    response.raise_for_status.return_value = None
+
+    get_mock = Mock(return_value=response)
+    monkeypatch.setattr("datasentinel.data_loader._http_get", get_mock)
+
+    out = load_http_data(
+        url="https://api.example.com/trades",
+        spark=spark,
+        response_format="json",
+        json_path="data.items",
+    )
+
+    assert out == "df"
+    get_mock.assert_called_once()
+    spark.createDataFrame.assert_called_once_with([{"id": 1, "book": "EQD"}])
+
+
+def test_load_http_data_csv_and_empty_csv(monkeypatch):
+    spark = Mock()
+    spark.createDataFrame.side_effect = ["df_nonempty", "df_empty"]
+
+    response_nonempty = Mock()
+    response_nonempty.text = "id,book\n1,EQD\n2,FICC\n"
+    response_nonempty.raise_for_status.return_value = None
+    response_empty = Mock()
+    response_empty.text = "id,book\n"
+    response_empty.raise_for_status.return_value = None
+
+    get_mock = Mock(side_effect=[response_nonempty, response_empty])
+    monkeypatch.setattr("datasentinel.data_loader._http_get", get_mock)
+
+    out_nonempty = load_http_data(
+        url="https://api.example.com/trades.csv",
+        spark=spark,
+        response_format="csv",
+    )
+    out_empty = load_http_data(
+        url="https://api.example.com/trades_empty.csv",
+        spark=spark,
+        response_format="csv",
+    )
+
+    assert out_nonempty == "df_nonempty"
+    assert out_empty == "df_empty"
+
+
+def test_load_http_data_validates_method_and_format(monkeypatch):
+    spark = Mock()
+    with pytest.raises(ValueError, match="supports only GET"):
+        load_http_data(
+            url="https://api.example.com/trades",
+            spark=spark,
+            response_format="json",
+            method="POST",
+        )
+
+    response = Mock()
+    response.raise_for_status.return_value = None
+    response.text = ""
+    response.json.return_value = {}
+    monkeypatch.setattr("datasentinel.data_loader._http_get", Mock(return_value=response))
+    with pytest.raises(ValueError, match="response_format must be one of: json, csv"):
+        load_http_data(
+            url="https://api.example.com/trades",
+            spark=spark,
+            response_format="xml",
         )

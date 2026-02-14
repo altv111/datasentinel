@@ -1,0 +1,14 @@
+steps:
+  - name: api_trades_csv
+    type: load
+    format: "http"
+    url: "https://api.example.com/trades.csv"
+    method: "GET"
+    params:
+      date: "2026-02-12"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+    response_format: "csv"
+    timeout_seconds: 30
+    write: true
+    write_format: "csv"

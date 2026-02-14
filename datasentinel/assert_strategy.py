@@ -55,6 +55,10 @@ class ReconBaseStrategy(AssertStrategy):
 
     required_attributes = ("join_columns", "compare_columns")
 
+    @staticmethod
+    def _with_counts(attributes: dict) -> bool:
+        return bool((attributes or {}).get("summary_with_counts"))
+
     def _parse_recon_attributes(self, attributes: dict):
         attributes = self.validate(attributes)
         join_cols = attributes.get("join_columns")
@@ -87,13 +91,22 @@ class FullOuterJoinStrategy(ReconBaseStrategy):
         attributes: dict
     ) -> Dict[str, Any]:
         join_cols, compare_cols, compare_defs = self._parse_recon_attributes(attributes)
-        return run_full_outer_join_recon(
+        out = run_full_outer_join_recon(
             df_a=df_a,
             df_b=df_b,
             join_cols=join_cols,
             compare_cols=compare_cols,
             compare_defs=compare_defs,
         )
+        if out.get("status") == "FAIL":
+            if self._with_counts(attributes):
+                mismatches = out["dataframes"]["mismatches"].count()
+                a_only = out["dataframes"]["a_only"].count()
+                b_only = out["dataframes"]["b_only"].count()
+                out["summary"] = f"mismatches={mismatches}, a_only={a_only}, b_only={b_only}"
+            else:
+                out["summary"] = "failed with mismatches/a_only/b_only"
+        return out
 
 
 # Placeholder for an Arrow-backed strategy; currently enforces row-level inference
@@ -166,7 +179,7 @@ class ArrowReconStrategy(FullOuterJoinStrategy):
         b_only_empty = b_only.rdd.isEmpty()
         status = "PASS" if mismatches_empty and a_only_empty and b_only_empty else "FAIL"
 
-        return {
+        out = {
             "status": status,
             "dataframes": {
                 "mismatches": mismatches,
@@ -174,6 +187,14 @@ class ArrowReconStrategy(FullOuterJoinStrategy):
                 "b_only": b_only,
             },
         }
+        if status == "FAIL":
+            if self._with_counts(attributes):
+                out["summary"] = (
+                    f"mismatches={mismatches.count()}, a_only={a_only.count()}, b_only={b_only.count()}"
+                )
+            else:
+                out["summary"] = "failed with mismatches/a_only/b_only"
+        return out
 
 
 # Alias strategy that supports per-column options (e.g., tolerances).
@@ -223,7 +244,7 @@ class LocalFastReconStrategy(ReconBaseStrategy):
             if mismatches_pd.empty and a_only_pd.empty and b_only_pd.empty
             else "FAIL"
         )
-        return {
+        out = {
             "status": status,
             "dataframes": {
                 "mismatches": mismatches,
@@ -231,6 +252,14 @@ class LocalFastReconStrategy(ReconBaseStrategy):
                 "b_only": b_only,
             },
         }
+        if status == "FAIL":
+            if self._with_counts(config):
+                out["summary"] = (
+                    f"mismatches={len(mismatches_pd)}, a_only={len(a_only_pd)}, b_only={len(b_only_pd)}"
+                )
+            else:
+                out["summary"] = "failed with mismatches/a_only/b_only"
+        return out
     def _join_local(self, df_left, df_right, join_cols, compare_cols):
         a = df_left.alias("a")
         b = df_right.alias("b")
@@ -320,9 +349,28 @@ class SqlAssertStrategy(AssertStrategy):
         else:
             raise ValueError("sql_assert returned non-boolean value.")
 
-        return {
+        out = {
             "status": "PASS" if passed else "FAIL",
             "dataframes": {
                 "result": result_df,
             },
         }
+        if out["status"] == "FAIL":
+            lhs_is_scalar, lhs_value = self._extract_scalar_value(df_a)
+            rhs_is_scalar, rhs_value = self._extract_scalar_value(df_b)
+            test_name = condition_name or "SQL"
+            if lhs_is_scalar and rhs_is_scalar:
+                out["summary"] = f"LHS = {lhs_value}, RHS = {rhs_value}, test = {test_name}"
+        return out
+
+    @staticmethod
+    def _extract_scalar_value(df: Optional[DataFrame]):
+        if df is None:
+            return False, None
+        columns = getattr(df, "columns", None)
+        if not isinstance(columns, (list, tuple)) or len(columns) != 1:
+            return False, None
+        rows = df.limit(2).collect()
+        if len(rows) != 1:
+            return False, None
+        return True, rows[0][0]

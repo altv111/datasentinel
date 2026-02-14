@@ -39,5 +39,6 @@ setup(
         "pyspark>=3.4,<3.5",  # Spark 3.4.x for Java 11 compatibility
         "pandas",
         "pyyaml",
+        "requests",
     ],
 )

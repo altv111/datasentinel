@@ -76,6 +76,8 @@ Loader-specific examples:
 - `examples/load_json_example.yaml`
 - `examples/load_parquet_example.yaml`
 - `examples/load_avro_example.yaml`
+- `examples/load_http_json_example.yaml`
+- `examples/load_http_csv_example.yaml`
 - `examples/load_jdbc_query_example.yaml`
 - `examples/load_jdbc_table_example.yaml`
 - `examples/large_recon_multikey_example.yaml` (csv load + transform + SQL assert + multi-key recon on large-ish sample data)
@@ -114,6 +116,53 @@ You can also provide queries instead of view names:
   test: IS_SUBSET_OF
 ```
 
+## Test Failure Summaries
+Test strategies can return a `summary` string, which is printed in the test log line:
+`[TEST] <name>: FAIL (<summary>)`.
+
+Recon strategies (`full_recon`, `localfast_recon`, `arrow_recon`):
+- Default failure summary is lightweight: `failed with mismatches/a_only/b_only`.
+- Detailed counts (`mismatches=<n>, a_only=<n>, b_only=<n>`) are computed only when:
+  - step-level `write: true`, or
+  - step-level `debug: true`, or
+  - `additional_attributes.summary_with_counts: true`.
+
+SQL assert strategy:
+- On failure, if both `LHS` and `RHS` are scalar (`1x1`), summary includes values:
+  - `LHS = <value>, RHS = <value>, test = <condition_name|SQL>`.
+
+Examples:
+```yaml
+- name: recon_light_summary
+  type: test
+  LHS: datasetA
+  RHS: datasetB
+  test: full_recon
+  additional_attributes:
+    join_columns: ["id"]
+    compare_columns: ["price"]
+
+- name: recon_count_summary
+  type: test
+  LHS: datasetA
+  RHS: datasetB
+  test: full_recon
+  write: true
+  additional_attributes:
+    join_columns: ["id"]
+    compare_columns: ["price"]
+
+- name: recon_force_counts_without_write
+  type: test
+  LHS: datasetA
+  RHS: datasetB
+  test: full_recon
+  additional_attributes:
+    summary_with_counts: true
+    join_columns: ["id"]
+    compare_columns: ["price"]
+```
+
 ## JDBC Loads
 Load steps support JDBC sources with either a full table read or a query read.
 
@@ -139,6 +188,46 @@ Example: query-based load
     user: "postgres"
     password: "postgres"
     fetchsize: "1000"
+```
+
+## HTTP Loads
+Load steps can fetch data from HTTP APIs and materialize response payloads into Spark DataFrames.
+
+Required fields for HTTP load steps:
+- `format: http`
+- `url`
+- `response_format` (`json` or `csv`)
+
+Optional fields:
+- `method` (currently only `GET` is supported)
+- `params` (query parameters)
+- `headers` (request headers, e.g. auth)
+- `timeout_seconds` (default `30`)
+- `json_path` (dot path for nested JSON, e.g. `data.items`)
+
+Example: JSON API load
+```yaml
+- name: api_trades_json
+  type: load
+  format: http
+  url: https://api.example.com/trades
+  method: GET
+  params:
+    date: "2026-02-12"
+    tradebook: EQD
+  headers:
+    Authorization: "Bearer ${API_TOKEN}"
+  response_format: json
+  json_path: data.items
+```
+
+Example: CSV API load
+```yaml
+- name: api_trades_csv
+  type: load
+  format: http
+  url: https://api.example.com/trades.csv
+  response_format: csv
 ```
 
 Example: full-table load

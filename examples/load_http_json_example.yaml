@@ -1,0 +1,16 @@
+steps:
+  - name: api_trades_json
+    type: load
+    format: "http"
+    url: "https://api.example.com/trades"
+    method: "GET"
+    params:
+      date: "2026-02-12"
+      tradebook: "EQD"
+    headers:
+      Authorization: "Bearer ${API_TOKEN}"
+    response_format: "json"
+    json_path: "data.items"
+    timeout_seconds: 30
+    write: true
+    write_format: "csv"

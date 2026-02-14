@@ -52,6 +52,56 @@ def test_full_outer_join_strategy_parse_recon_attributes_invalid_compare_columns
         )
 
 
+def test_full_outer_join_strategy_fail_summary_light_by_default(monkeypatch):
+    counts = {"mismatches": Mock(), "a_only": Mock(), "b_only": Mock()}
+    monkeypatch.setattr(
+        "datasentinel.assert_strategy.run_full_outer_join_recon",
+        lambda **_kwargs: {"status": "FAIL", "dataframes": counts},
+    )
+
+    out = FullOuterJoinStrategy().assert_(
+        Mock(),
+        Mock(),
+        {"join_columns": ["id"], "compare_columns": ["price"]},
+    )
+
+    assert out["summary"] == "failed with mismatches/a_only/b_only"
+    counts["mismatches"].count.assert_not_called()
+    counts["a_only"].count.assert_not_called()
+    counts["b_only"].count.assert_not_called()
+
+
+def test_full_outer_join_strategy_fail_summary_with_counts(monkeypatch):
+    mismatches = Mock()
+    a_only = Mock()
+    b_only = Mock()
+    mismatches.count.return_value = 2
+    a_only.count.return_value = 3
+    b_only.count.return_value = 4
+    monkeypatch.setattr(
+        "datasentinel.assert_strategy.run_full_outer_join_recon",
+        lambda **_kwargs: {
+            "status": "FAIL",
+            "dataframes": {"mismatches": mismatches, "a_only": a_only, "b_only": b_only},
+        },
+    )
+
+    out = FullOuterJoinStrategy().assert_(
+        Mock(),
+        Mock(),
+        {
+            "join_columns": ["id"],
+            "compare_columns": ["price"],
+            "summary_with_counts": True,
+        },
+    )
+
+    assert out["summary"] == "mismatches=2, a_only=3, b_only=4"
+    mismatches.count.assert_called_once()
+    a_only.count.assert_called_once()
+    b_only.count.assert_called_once()
+
+
 def test_sql_assert_strategy_inline_sql_numeric_truthy_passes():
     result_df = _FakeResultDataFrame(["passed"], [[1]])
     df_a, spark = _fake_df_with_spark(result_df)
@@ -79,6 +129,38 @@ def test_sql_assert_strategy_condition_lookup_and_failure_paths(monkeypatch):
 
     with pytest.raises(ValueError, match="Unknown condition_name"):
         SqlAssertStrategy().assert_(df_a, None, {"condition_name": "MISSING"})
+
+
+def test_sql_assert_strategy_fail_adds_scalar_summary():
+    result_df = _FakeResultDataFrame(["passed"], [[0]])
+    df_a, _ = _fake_df_with_spark(result_df)
+    df_b = _FakeResultDataFrame(["n"], [[12]])
+    df_a.columns = ["n"]
+    df_a._rows = [[10]]
+    df_a.limit = lambda _n: df_a
+    df_a.collect = lambda: df_a._rows
+    df_b.createOrReplaceTempView = Mock()
+
+    out = SqlAssertStrategy().assert_(df_a, df_b, {"condition_name": "EQUALS"})
+
+    assert out["status"] == "FAIL"
+    assert out["summary"] == "LHS = 10, RHS = 12, test = EQUALS"
+
+
+def test_sql_assert_strategy_fail_without_scalar_has_no_summary():
+    result_df = _FakeResultDataFrame(["passed"], [[0]])
+    df_a, _ = _fake_df_with_spark(result_df)
+    df_b = _FakeResultDataFrame(["x", "y"], [[1, 2]])
+    df_a.columns = ["n"]
+    df_a._rows = [[10], [11]]
+    df_a.limit = lambda _n: df_a
+    df_a.collect = lambda: df_a._rows
+    df_b.createOrReplaceTempView = Mock()
+
+    out = SqlAssertStrategy().assert_(df_a, df_b, {"condition_name": "EQUALS"})
+
+    assert out["status"] == "FAIL"
+    assert "summary" not in out
 
 
 def test_sql_assert_strategy_requires_single_row_and_single_column():
@@ -141,4 +223,94 @@ def test_tester_executor_injects_condition_name_and_uses_table(monkeypatch):
     strategy.assert_.assert_called_once()
     _, _, attrs = strategy.assert_.call_args[0]
     assert attrs["condition_name"] == "IS_EMPTY"
+    assert attrs["summary_with_counts"] is False
     assert out["status"] == "PASS"
+
+
+def test_tester_executor_enables_count_summary_for_write_or_debug(monkeypatch):
+    spark = Mock()
+    spark.table.return_value = Mock()
+
+    strategy = Mock()
+    strategy.assert_ = Mock(return_value={"status": "PASS", "dataframes": {}})
+    monkeypatch.setattr(
+        "datasentinel.executor.StrategyFactory.get_assert_strategy",
+        lambda _config: strategy,
+    )
+
+    executor = executor_module.TesterExecutor(
+        spark=spark,
+        config={"type": "test", "name": "t1", "LHS": "lhs", "write": True, "test": "IS_EMPTY"},
+        path_resolver=Mock(),
+        run_id="rid",
+    )
+    executor.execute()
+    _, _, attrs = strategy.assert_.call_args[0]
+    assert attrs["summary_with_counts"] is True
+
+    strategy.assert_.reset_mock()
+    executor = executor_module.TesterExecutor(
+        spark=spark,
+        config={"type": "test", "name": "t2", "LHS": "lhs", "debug": True, "test": "IS_EMPTY"},
+        path_resolver=Mock(),
+        run_id="rid",
+    )
+    executor.execute()
+    _, _, attrs = strategy.assert_.call_args[0]
+    assert attrs["summary_with_counts"] is True
+
+
+def test_tester_executor_fail_prints_strategy_summary(capsys, monkeypatch):
+    spark = Mock()
+    spark.table.side_effect = [Mock(), Mock()]
+
+    strategy = Mock()
+    strategy.assert_ = Mock(
+        return_value={
+            "status": "FAIL",
+            "summary": "LHS = 10, RHS = 12, test = EQUALS",
+            "dataframes": {},
+        }
+    )
+    monkeypatch.setattr(
+        "datasentinel.executor.StrategyFactory.get_assert_strategy",
+        lambda _config: strategy,
+    )
+
+    executor = executor_module.TesterExecutor(
+        spark=spark,
+        config={"type": "test", "name": "t1", "LHS": "lhs", "RHS": "rhs", "test": "EQUALS"},
+        path_resolver=Mock(),
+        run_id="rid",
+    )
+    executor.execute()
+
+    captured = capsys.readouterr()
+    assert "[TEST] t1:" in captured.out
+    assert "FAIL" in captured.out
+    assert "(LHS = 10, RHS = 12, test = EQUALS)" in captured.out
+
+
+def test_tester_executor_fail_skips_summary_when_absent(capsys, monkeypatch):
+    spark = Mock()
+    spark.table.side_effect = [Mock(), Mock()]
+
+    strategy = Mock()
+    strategy.assert_ = Mock(return_value={"status": "FAIL", "dataframes": {}})
+    monkeypatch.setattr(
+        "datasentinel.executor.StrategyFactory.get_assert_strategy",
+        lambda _config: strategy,
+    )
+
+    executor = executor_module.TesterExecutor(
+        spark=spark,
+        config={"type": "test", "name": "t1", "LHS": "lhs", "RHS": "rhs", "test": "EQUALS"},
+        path_resolver=Mock(),
+        run_id="rid",
+    )
+    executor.execute()
+
+    captured = capsys.readouterr()
+    assert "[TEST] t1:" in captured.out
+    assert "FAIL" in captured.out
+    assert "LHS =" not in captured.out
