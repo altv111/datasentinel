@@ -27,8 +27,88 @@ and clear failure reporting**, while staying close to Spark.
 - CLI-driven execution
 - Designed for large datasets
 
+## Quick Start
+```bash
+datasentinel examples/full_recon_test.yaml
+```
+
+```python
+from datasentinel import run, AssertStrategy
+```
+Environment: `SENTINEL_HOME` sets the base directory for result writes. `SENTINEL_INPUT_HOME` sets the base directory for relative input paths in YAML.
+
+## What can you do with DataSentinel?
+
+DataSentinel is built around a simple pipeline model: **load data**, **transform it into comparable shapes**, then **run tests** that produce clear pass/fail outcomes.
+
+Use it when you want to validate data movement between systems, enforce quality rules, or add automated checks to Spark jobs without building custom test harnesses.
+
+## Key actions
+- `load` steps (Loaders)  
+  Bring data from files, APIs, or databases into Spark DataFrames.  
+  Supported sources include CSV, JSON, Parquet, Avro, HTTP (`json`/`csv`), and JDBC (`query` or `table` mode).
+
+- `transform` steps (Transformers)  
+  Run Spark SQL to shape, clean, filter, or enrich datasets before testing.  
+  This lets you normalize schemas or derive comparable columns before reconciliation.
+
+- `test` steps (Tests)  
+  Validate datasets with declarative YAML tests:
+  - Recon tests: compare two datasets using join keys and compare-column rules, with tolerance and type semantics support.
+  - SQL assert tests: run boolean SQL conditions against one dataset (`LHS`) or dataset pairs (`LHS`/`RHS`).
+
+Typical flow:
+1. Load source A and source B.
+2. Transform both into test-ready views.
+3. Run recon and/or SQL assert tests.
+4. Inspect pass/fail status and optional written outputs for debugging.
+
+## Example YAML
+This single config shows the full flow in one place: two loaders, one transformer, one SQL assert, and one recon test.
+Runnable file: `examples/readme_end_to_end.yaml`
+
+```yaml
+steps:
+  - name: source_a
+    type: load
+    format: csv
+    path: examples/data/trades_left_large.csv
+
+  - name: source_b
+    type: load
+    format: csv
+    path: examples/data/trades_right_large.csv
+
+  - name: normalized_a
+    type: transform
+    query: |
+      SELECT
+        trade_id,
+        tradebook,
+        CAST(price AS DOUBLE) AS price,
+        CAST(quantity AS DOUBLE) AS quantity
+      FROM source_a
+
+  - name: assert_no_non_positive_price
+    type: test
+    LHS_query: "SELECT * FROM normalized_a WHERE price <= 0"
+    test: IS_EMPTY
+
+  - name: recon_prices_and_quantity
+    type: test
+    LHS: normalized_a
+    RHS: source_b
+    test: full_recon
+    additional_attributes:
+      join_columns: ["trade_id", "tradebook"]
+      compare_columns:
+        price:
+          tolerance: 0.01
+        quantity: {}
+```
+
 ## Recon Strategy Semantics
-DataSentinel provides multiple recon strategies. The two main ones are:
+DataSentinel provides multiple recon strategies. The three main ones are:
 - `FullOuterJoinStrategy` (Spark-native join + per-row comparison)
 - `LocalFastReconStrategy` (Spark join + Pandas local tolerance kernel)
 - `ArrowReconStrategy` (experimental; row-level inference only; requires native Arrow extension)
@@ -60,16 +140,6 @@ Design notes for the Arrow-backed strategy live in `docs/arrow_recon.md`.
 Enable Arrow recon with `DATASENTINEL_ARROW=1` and install the native extension. This is optional;
 if you do not use `arrow_recon`, the rest of the package works normally.
 
-## Quick Start
-```bash
-datasentinel examples/full_recon_test.yaml
-```
-
-```python
-from datasentinel import run, AssertStrategy
-```
-
-Environment: `SENTINEL_HOME` sets the base directory for result writes. `SENTINEL_INPUT_HOME` sets the base directory for relative input paths in YAML.
 
 Loader-specific examples:
 - `examples/load_csv_example.yaml`

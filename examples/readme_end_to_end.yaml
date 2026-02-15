@@ -1,0 +1,37 @@
+steps:
+  - name: source_a
+    type: load
+    format: csv
+    path: examples/data/trades_left_large.csv
+
+  - name: source_b
+    type: load
+    format: csv
+    path: examples/data/trades_right_large.csv
+
+  - name: normalized_a
+    type: transform
+    query: |
+      SELECT
+        trade_id,
+        tradebook,
+        CAST(price AS DOUBLE) AS price,
+        CAST(quantity AS DOUBLE) AS quantity
+      FROM source_a
+
+  - name: assert_no_non_positive_price
+    type: test
+    LHS_query: "SELECT * FROM normalized_a WHERE price <= 0"
+    test: IS_EMPTY
+
+  - name: recon_prices_and_quantity
+    type: test
+    LHS: normalized_a
+    RHS: source_b
+    test: full_recon
+    additional_attributes:
+      join_columns: ["trade_id", "tradebook"]
+      compare_columns:
+        price:
+          tolerance: 0.01
+        quantity: {}
